@@ -54,6 +54,6 @@ void main(void) {
 
 	float yn = mod(gl_FragCoord.y / 2.0, 3);
 
-	fragColour = vec4(wave * yn, max(0.3, wave2.a));
+	fragColour = vec4(wave * 0.5, max(0.3, wave2.a));
 }
 

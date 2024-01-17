@@ -10,7 +10,7 @@ using namespace glm;
 Cylinder::Cylinder(std::string filename, GLuint meshIndex) : AIMesh(filename, meshIndex) {
 
 	// Load textures
-	wave1Texture = loadTexture("Assets\\shrine\\grey.png", FIF_PNG);
+
 	wave2Texture = loadTexture("Assets\\shrine\\white.png", FIF_PNG);
 
 	// Load shader
@@ -18,13 +18,13 @@ Cylinder::Cylinder(std::string filename, GLuint meshIndex) : AIMesh(filename, me
 
 	// Get uniform locations
 	shader_mvpMatrix = glGetUniformLocation(shader, "mvpMatrix");
-	shader_wave1Texture = glGetUniformLocation(shader, "wave1Texture");
+
 	shader_wave2Texture = glGetUniformLocation(shader, "wave2Texture");
 
 
 	// Set uniform values that will not change (ie. texture sampler values)
 	glUseProgram(shader);
-	glUniform1i(shader_wave1Texture, 1);
+	
 	glUniform1i(shader_wave2Texture, 2);
 	glUseProgram(0); // restore default
 }
@@ -36,8 +36,7 @@ void Cylinder::preRender() {
 	AIMesh::preRender(); // will not bind texture since inherited texture = 0
 
 	// Now bind wave textures
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, wave1Texture);
+	
 
 	glActiveTexture(GL_TEXTURE2);
 	glBindTexture(GL_TEXTURE_2D, wave2Texture);

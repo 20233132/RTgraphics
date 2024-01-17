@@ -25,5 +25,7 @@ public:
 	vec3 getPos();
 	vec3 getScale();
 	void rend(GLint matrix);
+	void roof(GLint matrix);
+	void norm( GLint normMatrix );
 };
 

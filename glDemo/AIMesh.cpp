@@ -32,6 +32,17 @@ AIMesh::AIMesh(std::string filename, GLuint meshIndex) {
 	glBindBuffer(GL_ARRAY_BUFFER, meshNormalBuffer);
 	glBufferData(GL_ARRAY_BUFFER, mesh->mNumVertices * sizeof(aiVector3D), mesh->mNormals, GL_STATIC_DRAW);
 
+
+	// *** normal mapping *** Setup VBO for tangent and bi-tangent data
+	glGenBuffers(1, &meshTanBuf);
+	glBindBuffer(GL_ARRAY_BUFFER, meshTanBuf);
+	glBufferData(GL_ARRAY_BUFFER, mesh->mNumVertices * sizeof(aiVector3D), mesh->mTangents, GL_STATIC_DRAW);
+
+	glGenBuffers(1, &meshBiTanBuf);
+	glBindBuffer(GL_ARRAY_BUFFER, meshBiTanBuf);
+	glBufferData(GL_ARRAY_BUFFER, mesh->mNumVertices * sizeof(aiVector3D), mesh->mBitangents, GL_STATIC_DRAW);
+
+
 	if (mesh->mTextureCoords && mesh->mTextureCoords[0]) {
 
 		// Setup VBO for texture coordinate data (for now use uvw channel 0 only when accessing mesh->mTextureCoords)
@@ -74,7 +85,10 @@ void AIMesh::addTexture(std::string filename, FREE_IMAGE_FORMAT format) {
 
 	textureID = loadTexture(filename, format);
 }
-
+void AIMesh::addNormal(std::string file, FREE_IMAGE_FORMAT form)
+{
+	normal = loadTexture(file, form);
+}
 
 void AIMesh::preRender() {
 
@@ -87,6 +101,14 @@ void AIMesh::preRender() {
 	glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 0, (const GLvoid*)0);
 	glEnableVertexAttribArray(3);
 
+	glBindBuffer(GL_ARRAY_BUFFER, meshTanBuf);
+	glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 0, (const GLvoid*)0);
+	glEnableVertexAttribArray(4);
+
+	glBindBuffer(GL_ARRAY_BUFFER, meshBiTanBuf);
+	glVertexAttribPointer(5, 3, GL_FLOAT, GL_FALSE, 0, (const GLvoid*)0);
+	glEnableVertexAttribArray(5);
+
 	if (meshTexCoordBuffer != 0) {
 
 		glBindBuffer(GL_ARRAY_BUFFER, meshTexCoordBuffer);
@@ -96,6 +118,16 @@ void AIMesh::preRender() {
 		if (textureID != 0) {
 			glEnable(GL_TEXTURE_2D);
 			glBindTexture(GL_TEXTURE_2D, textureID);
+
+			if (normal != 0) {
+
+				glActiveTexture(GL_TEXTURE1);
+				glBindTexture(GL_TEXTURE_2D, normal);
+
+				// Restore default
+				glActiveTexture(GL_TEXTURE0);
+			}
+
 		}
 	}
 
@@ -121,7 +153,16 @@ void AIMesh::postRender() {
 
 		if (textureID != 0) {
 			glDisable(GL_TEXTURE_2D);
+			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_2D, 0);
+
+			if (normal != 0) {
+
+				glActiveTexture(GL_TEXTURE1);
+				glBindTexture(GL_TEXTURE_2D, 0);
+			}
+
+			glActiveTexture(GL_TEXTURE0);
 		}
 	}
 

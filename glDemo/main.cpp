@@ -45,7 +45,7 @@ struct PointLight {
 		attenuation = vec3(1.0f, 1.0f, 1.0f);
 	}
 
-	PointLight(vec3 pos, vec3 colour = vec3(1.0f, 1.0f, 1.0f), vec3 attenuation = vec3(1.0f, 1.0f, 1.0f)) {
+	PointLight(vec3 pos, vec3 colour , vec3 attenuation)  {
 
 		this->pos = pos;
 		this->colour = colour;
@@ -75,12 +75,15 @@ bool				forwardPressed;
 bool				backPressed;
 bool				rotateLeftPressed;
 bool				rotateRightPressed;
+bool sceneTwo;
+bool sceneOne;
 
 
 // Scene objects
 AIMesh*				groundMesh = nullptr;
 AIMesh*				creatureMesh = nullptr;
 AIMesh* outMesh = nullptr;
+AIMesh* normalEx = nullptr;
 
 
 Cylinder*			cylinderMesh = nullptr;
@@ -107,11 +110,20 @@ GLint				texPointLightShader_lightPosition;
 GLint				texPointLightShader_lightColour;
 GLint				texPointLightShader_lightAttenuation;
 
+GLuint				nMapDirLightShader;
+GLint				nMapDirLightShader_modelMatrix;
+GLint				nMapDirLightShader_viewMatrix;
+GLint				nMapDirLightShader_projMatrix;
+GLint				nMapDirLightShader_diffuseTexture;
+GLint				nMapDirLightShader_normalMapTexture;
+GLint				nMapDirLightShader_lightDirection;
+GLint				nMapDirLightShader_lightColour;
+
 bool forFlag;
 bool backFlag;
 
 // cylinder model
-vec3 cylinderPos = vec3(10.0f, 0.0f, 10.0f);
+vec3 cylinderPos = vec3(0.0f,1.5f, 0.0f);
 
 // beast model
 
@@ -123,8 +135,9 @@ vec3 cylinderPos = vec3(10.0f, 0.0f, 10.0f);
 DirectionalLight directLight = DirectionalLight(vec3(5.f,2.0f , 2.0f), vec3(.3f, .20f, .20f));
 
 // Setup point light example light (use array to make adding other lights easier later)
-PointLight lights[1] = {
-	PointLight(vec3(0.0f, 1.0f, 0.0), vec3(1.0f, 0.0f, 0.0f), vec3(1.0f, 0.1f, 0.001f))
+PointLight lights[2] = {
+	PointLight(vec3(.0f, 1.0f, 0.0f), vec3(2.0f, 2.0f, 0.0f), vec3(1.0f, .1f, 0.001f)),
+	PointLight(vec3(-15.0f,5.0f,-15.0f),vec3(0.0f,0.0f,2.0f), vec3(1.0f,.1f,.001f))
 };
 Shrine* shrine = new Shrine();
 upgShrine* shrineUpg = new upgShrine();
@@ -134,9 +147,7 @@ upgShrine* shrineUpg = new upgShrine();
 
 // Function prototypes
 void renderScene();
-void renderWithDirectionalLight();
 
-void renderWithMultipleLights();
 void updateScene();
 void resizeWindow(GLFWwindow* window, int width, int height);
 void keyboardHandler(GLFWwindow* window, int key, int scancode, int action, int mods);
@@ -230,7 +241,13 @@ int main() {
 	{
 		outMesh->addTexture("Assets\\woodTexture.png", FIF_PNG);
 	}
+	normalEx = new AIMesh(string("Assets\\shrine\\column.obj"));
 
+	if (normalEx)
+	{
+		normalEx->addTexture("Assets\\shrine\\Marble.png", FIF_PNG);
+		normalEx->addNormal("Assets\\shrine\\ColumnNormalsMap.png", FIF_PNG);
+	}
 
 	creatureMesh = new AIMesh(string("Assets\\beast\\beast.obj"));
 	if (creatureMesh) {
@@ -245,6 +262,7 @@ int main() {
 	// Load shaders
 	texPointLightShader = setupShaders(string("Assets\\Shaders\\texture-point.vert"), string("Assets\\Shaders\\texture-point.frag"));
 	texDirLightShader = setupShaders(string("Assets\\Shaders\\texture-directional.vert"), string("Assets\\Shaders\\texture-directional.frag"));
+	nMapDirLightShader = setupShaders(string("Assets\\Shaders\\nmap-directional.vert"), string("Assets\\Shaders\\nmap-directional.frag"));
 
 	// Get uniform variable locations for setting values later during rendering
 	texDirLightShader_modelMatrix = glGetUniformLocation(texDirLightShader, "modelMatrix");
@@ -262,6 +280,13 @@ int main() {
 	texPointLightShader_lightColour = glGetUniformLocation(texPointLightShader, "lightColour");
 	texPointLightShader_lightAttenuation = glGetUniformLocation(texPointLightShader, "lightAttenuation");
 
+	nMapDirLightShader_modelMatrix = glGetUniformLocation(nMapDirLightShader, "modelMatrix");
+	nMapDirLightShader_viewMatrix = glGetUniformLocation(nMapDirLightShader, "viewMatrix");
+	nMapDirLightShader_projMatrix = glGetUniformLocation(nMapDirLightShader, "projMatrix");
+	nMapDirLightShader_diffuseTexture = glGetUniformLocation(nMapDirLightShader, "diffuseTexture");
+	nMapDirLightShader_normalMapTexture = glGetUniformLocation(nMapDirLightShader, "normalMapTexture");
+	nMapDirLightShader_lightDirection = glGetUniformLocation(nMapDirLightShader, "lightDirection");
+	nMapDirLightShader_lightColour = glGetUniformLocation(nMapDirLightShader, "lightColour");
 
 	//
 	// 2. Main loop
@@ -295,13 +320,6 @@ int main() {
 // renderScene - function to render the current scene
 void renderScene()
 {
-	renderWithDirectionalLight();
-	//renderWithPointLight();
-	//renderWithMultipleLights();
-}
-
-// Demonstrate the use of a single directional light source
-void renderWithDirectionalLight() {
 
 	// Clear the rendering window
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -322,7 +340,7 @@ void renderWithDirectionalLight() {
 
 #pragma region Render opaque objects
 
-	
+
 
 
 	if (groundMesh) {
@@ -330,7 +348,7 @@ void renderWithDirectionalLight() {
 		mat4 modelTransform = glm::scale(identity<mat4>(), vec3(20.0f, 1.0f, 20.0f));
 
 		glUniformMatrix4fv(texDirLightShader_modelMatrix, 1, GL_FALSE, (GLfloat*)&modelTransform);
-		
+
 		groundMesh->preRender();
 		groundMesh->render();
 		groundMesh->postRender();
@@ -348,17 +366,118 @@ void renderWithDirectionalLight() {
 	}
 
 
-	
+
 	shrine->rend(texDirLightShader_modelMatrix);
 	shrineUpg->rend(texDirLightShader_modelMatrix);
-	
-	
-	
-	
+
+	glUseProgram(nMapDirLightShader);
+
+	// Setup uniforms
+	glUniformMatrix4fv(nMapDirLightShader_viewMatrix, 1, GL_FALSE, (GLfloat*)&cameraView);
+	glUniformMatrix4fv(nMapDirLightShader_projMatrix, 1, GL_FALSE, (GLfloat*)&cameraProjection);
+	glUniform1i(nMapDirLightShader_diffuseTexture, 0);
+	glUniform1i(nMapDirLightShader_normalMapTexture, 1);
+	glUniform3fv(nMapDirLightShader_lightDirection, 1, (GLfloat*)&(directLight.direction));
+	glUniform3fv(nMapDirLightShader_lightColour, 1, (GLfloat*)&(directLight.colour));
+
+	if (normalEx) {
+
+		mat4 modelTransform = glm::translate(identity<mat4>(), vec3(0.0f, 0.0f, 10.0f)) * glm::scale(identity<mat4>(), vec3(0.1f, 0.1f, 0.1f));
+
+		glUniformMatrix4fv(nMapDirLightShader_modelMatrix, 1, GL_FALSE, (GLfloat*)&modelTransform);
+
+		normalEx->preRender();
+		normalEx->render();
+		normalEx->postRender();
+	}
+
+
 
 #pragma endregion
+#pragma region re-rendering with point
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_ONE, GL_ONE);
 
 
+	glUseProgram(texPointLightShader);
+
+	glUniformMatrix4fv(texPointLightShader_viewMatrix, 1, GL_FALSE, (GLfloat*)&cameraView);
+	glUniformMatrix4fv(texPointLightShader_projMatrix, 1, GL_FALSE, (GLfloat*)&cameraProjection);
+	glUniform1i(texPointLightShader_texture, 0); // set to point to texture unit 0 for AIMeshes
+	glUniform3fv(texPointLightShader_lightPosition, 1, (GLfloat*)&(lights[0].pos));
+	glUniform3fv(texPointLightShader_lightColour, 1, (GLfloat*)&(lights[0].colour));
+	glUniform3fv(texPointLightShader_lightAttenuation, 1, (GLfloat*)&(lights[0].attenuation));
+
+	if (groundMesh) {
+
+		mat4 modelTransform = glm::scale(identity<mat4>(), vec3(20.0f, 1.0f, 20.0f));
+
+		glUniformMatrix4fv(texPointLightShader_modelMatrix, 1, GL_FALSE, (GLfloat*)&modelTransform);
+
+		groundMesh->preRender();
+		groundMesh->render();
+		groundMesh->postRender();
+	}
+
+	if (outMesh)
+	{
+		mat4 modelTransform = glm::scale(identity<mat4>(), vec3(0.2f, .1f, 0.2f));
+
+		glUniformMatrix4fv(texPointLightShader_modelMatrix, 1, GL_FALSE, (GLfloat*)&modelTransform);
+
+		outMesh->preRender();
+		outMesh->render();
+		outMesh->postRender();
+	}
+
+
+	
+	shrine->rend(texPointLightShader_modelMatrix);
+	shrineUpg->rend(texPointLightShader_modelMatrix);
+
+#pragma endregion
+#pragma region re-rendering with point 2
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_ONE, GL_ONE);
+
+
+	glUseProgram(texPointLightShader);
+
+	glUniformMatrix4fv(texPointLightShader_viewMatrix, 1, GL_FALSE, (GLfloat*)&cameraView);
+	glUniformMatrix4fv(texPointLightShader_projMatrix, 1, GL_FALSE, (GLfloat*)&cameraProjection);
+	glUniform1i(texPointLightShader_texture, 0); // set to point to texture unit 0 for AIMeshes
+	glUniform3fv(texPointLightShader_lightPosition, 1, (GLfloat*)&(lights[1].pos));
+	glUniform3fv(texPointLightShader_lightColour, 1, (GLfloat*)&(lights[1].colour));
+	glUniform3fv(texPointLightShader_lightAttenuation, 1, (GLfloat*)&(lights[1].attenuation));
+
+	if (groundMesh) {
+
+		mat4 modelTransform = glm::scale(identity<mat4>(), vec3(20.0f, 1.0f, 20.0f));
+
+		glUniformMatrix4fv(texPointLightShader_modelMatrix, 1, GL_FALSE, (GLfloat*)&modelTransform);
+
+		groundMesh->preRender();
+		groundMesh->render();
+		groundMesh->postRender();
+	}
+
+	if (outMesh)
+	{
+		mat4 modelTransform = glm::scale(identity<mat4>(), vec3(0.2f, .1f, 0.2f));
+
+		glUniformMatrix4fv(texPointLightShader_modelMatrix, 1, GL_FALSE, (GLfloat*)&modelTransform);
+
+		outMesh->preRender();
+		outMesh->render();
+		outMesh->postRender();
+	}
+
+
+
+	shrine->rend(texPointLightShader_modelMatrix);
+	shrineUpg->rend(texPointLightShader_modelMatrix);
+
+#pragma endregion
 #pragma region Render transparant objects
 
 	// Done with textured meshes - render transparent objects now (cylinder in this example)...
@@ -379,11 +498,9 @@ void renderWithDirectionalLight() {
 
 #pragma endregion
 
-	
-	//
-	// For demo purposes, render directional light source
-	//
-	
+
+
+
 	// Restore fixed-function pipeline
 	glUseProgram(0);
 
@@ -398,119 +515,8 @@ void renderWithDirectionalLight() {
 }
 
 
-// Demonstrate the use of a single point light source
 
 
-void renderWithMultipleLights() {
-
-	// Clear the rendering window
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	// Get camera matrices
-	mat4 cameraProjection = mainCamera->projectionTransform();
-	mat4 cameraView = mainCamera->viewTransform();
-
-
-#pragma region Render all opaque objects with directional light
-
-	glUseProgram(texDirLightShader);
-
-	glUniformMatrix4fv(texDirLightShader_viewMatrix, 1, GL_FALSE, (GLfloat*)&cameraView);
-	glUniformMatrix4fv(texDirLightShader_projMatrix, 1, GL_FALSE, (GLfloat*)&cameraProjection);
-	glUniform1i(texDirLightShader_texture, 0); // set to point to texture unit 0 for AIMeshes
-	glUniform3fv(texDirLightShader_lightDirection, 1, (GLfloat*)&(directLight.direction));
-	glUniform3fv(texDirLightShader_lightColour, 1, (GLfloat*)&(directLight.colour));
-
-	if (groundMesh) {
-
-		mat4 modelTransform = glm::scale(identity<mat4>(), vec3(10.0f, 1.0f, 10.0f));
-
-		glUniformMatrix4fv(texDirLightShader_modelMatrix, 1, GL_FALSE, (GLfloat*)&modelTransform);
-
-		groundMesh->preRender();
-		groundMesh->render();
-		groundMesh->postRender();
-	}
-
-
-
-
-#pragma endregion
-
-
-
-	// Enable additive blending for ***subsequent*** light sources!!!
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_ONE, GL_ONE);
-
-
-
-#pragma region Render all opaque objects with point light
-
-	glUseProgram(texPointLightShader);
-
-	glUniformMatrix4fv(texPointLightShader_viewMatrix, 1, GL_FALSE, (GLfloat*)&cameraView);
-	glUniformMatrix4fv(texPointLightShader_projMatrix, 1, GL_FALSE, (GLfloat*)&cameraProjection);
-	glUniform1i(texPointLightShader_texture, 0); // set to point to texture unit 0 for AIMeshes
-	glUniform3fv(texPointLightShader_lightPosition, 1, (GLfloat*)&(lights[0].pos));
-	glUniform3fv(texPointLightShader_lightColour, 1, (GLfloat*)&(lights[0].colour));
-	glUniform3fv(texPointLightShader_lightAttenuation, 1, (GLfloat*)&(lights[0].attenuation));
-
-	if (groundMesh) {
-
-		mat4 modelTransform = glm::scale(identity<mat4>(), vec3(10.0f, 1.0f, 10.0f));
-
-		glUniformMatrix4fv(texPointLightShader_modelMatrix, 1, GL_FALSE, (GLfloat*)&modelTransform);
-
-		groundMesh->preRender();
-		groundMesh->render();
-		groundMesh->postRender();
-	}
-
-#pragma endregion
-
-
-#pragma region Render transparant objects
-
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-	if (cylinderMesh) {
-
-		mat4 T = cameraProjection * cameraView * glm::translate(identity<mat4>(), cylinderPos);
-
-		cylinderMesh->preRender();
-		cylinderMesh->render(T);
-		cylinderMesh->postRender();
-	}
-
-	glDisable(GL_BLEND);
-
-#pragma endregion
-
-
-	//
-	// For demo purposes, render light sources
-	//
-
-	// Restore fixed-function
-	glUseProgram(0);
-
-	mat4 cameraT = cameraProjection * cameraView;
-	glLoadMatrixf((GLfloat*)&cameraT);
-	glEnable(GL_POINT_SMOOTH);
-	glPointSize(10.0f);
-	
-	glBegin(GL_POINTS);
-
-	glColor3f(directLight.colour.r, directLight.colour.g, directLight.colour.b);
-	glVertex3f(directLight.direction.x * 10.0f, directLight.direction.y * 10.0f, directLight.direction.z * 10.0f);
-
-	glColor3f(lights[0].colour.r, lights[0].colour.g, lights[0].colour.b);
-	glVertex3f(lights[0].pos.x, lights[0].pos.y, lights[0].pos.z);
-	
-	glEnd();
-}
 
 
 // Function called to animate elements in the scene
@@ -561,7 +567,15 @@ void updateScene() {
 	{
 		backFlag = false;
 	}
+	if (sceneOne)
+	{
+		directLight.direction = vec3(5.f, 2.0f, 2.0f);
 
+	}
+	if (sceneTwo)
+	{
+		directLight.direction = vec3(5.f, 2.0f, -8.0f);
+	}
 
 	if (rotateLeftPressed) {
 
@@ -620,6 +634,17 @@ void keyboardHandler(GLFWwindow* window, int key, int scancode, int action, int 
 			case GLFW_KEY_D:
 				rotateRightPressed = true;
 				break;
+
+			case GLFW_KEY_1:
+				sceneOne = true;
+				sceneTwo = false;
+				break;
+
+			case GLFW_KEY_2:
+				sceneTwo = true;
+				sceneOne = false;
+				break;
+
 
 			default:
 			{

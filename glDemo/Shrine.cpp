@@ -24,7 +24,9 @@ void Shrine::init(vec3 position)
 	pillarMesh = new AIMesh(string("Assets\\shrine\\column.obj"));
 	roofMesh = new AIMesh(string("Assets\\shrine\\roof.obj"));
 	pillarMesh->addTexture("Assets\\shrine\\Marble.png", FIF_PNG);
+	
 	roofMesh->addTexture("Assets\\shrine\\Marble.png", FIF_PNG);
+	
 }
 
 AIMesh* Shrine::getPillar()
@@ -69,4 +71,8 @@ void Shrine::rend(GLint matrix)
 		roofMesh->render();
 		roofMesh->postRender();
 	}
+
+
+
+
 }
