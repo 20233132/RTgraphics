@@ -10,8 +10,8 @@ using namespace glm;
 Cylinder::Cylinder(std::string filename, GLuint meshIndex) : AIMesh(filename, meshIndex) {
 
 	// Load textures
-	wave1Texture = loadTexture("Assets\\cylinder\\waves1.png", FIF_PNG);
-	wave2Texture = loadTexture("Assets\\cylinder\\waves2.png", FIF_PNG);
+	wave1Texture = loadTexture("Assets\\shrine\\grey.png", FIF_PNG);
+	wave2Texture = loadTexture("Assets\\shrine\\white.png", FIF_PNG);
 
 	// Load shader
 	shader = setupShaders(string("Assets\\cylinder\\cylinder.vert"), string("Assets\\cylinder\\cylinder.frag"));
@@ -20,8 +20,7 @@ Cylinder::Cylinder(std::string filename, GLuint meshIndex) : AIMesh(filename, me
 	shader_mvpMatrix = glGetUniformLocation(shader, "mvpMatrix");
 	shader_wave1Texture = glGetUniformLocation(shader, "wave1Texture");
 	shader_wave2Texture = glGetUniformLocation(shader, "wave2Texture");
-	shader_wave1Phase = glGetUniformLocation(shader, "wave1Phase");
-	shader_wave2Phase = glGetUniformLocation(shader, "wave2Phase");
+
 
 	// Set uniform values that will not change (ie. texture sampler values)
 	glUseProgram(shader);
@@ -51,10 +50,11 @@ void Cylinder::preRender() {
 void Cylinder::render(mat4 transform) {
 
 	// Handle cylinder effects internally so setup shader here
+	transform = transform * glm::scale(identity<mat4>(), vec3(0.05f,0.05f,0.05f));
 	glUseProgram(shader);
 	glUniformMatrix4fv(shader_mvpMatrix, 1, GL_FALSE, (GLfloat*)&transform);
-	glUniform1f(shader_wave1Phase, cosf(glm::radians<float>(wavePhase)));
-	glUniform1f(shader_wave2Phase, sinf(glm::radians<float>(wavePhase)));
+	//glUniform1f(shader_wave1Phase, cosf(glm::radians<float>(wavePhase)));
+	//glUniform1f(shader_wave2Phase, sinf(glm::radians<float>(wavePhase)));
 
 	AIMesh::render();
 }
@@ -65,15 +65,8 @@ void Cylinder::postRender() {
 }
 
 
-void Cylinder::update(float tDelta) {
+void Cylinder::update() {
 
-	wavePhase += 15.0f * tDelta;  // 30 degree per second
-
-	if (wavePhase >= 360.0f) {
-		 
-		// wrap round to keep in [0, 360) range
-		// assume we never jump >360 degrees in one frame :)
-		wavePhase -= 360.0f;
-	}
+	
 }
 

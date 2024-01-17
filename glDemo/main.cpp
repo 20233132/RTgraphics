@@ -7,6 +7,7 @@
 #include "AIMesh.h"
 #include "Cylinder.h"
 #include "Shrine.h"
+#include "upgShrine.h"
 
 
 using namespace std;
@@ -24,7 +25,7 @@ struct DirectionalLight {
 		colour = vec3(1.0f, 1.0f, 1.0f);
 	}
 
-	DirectionalLight(vec3 direction, vec3 colour = vec3(1.0f, 1.0f, 1.0f)) {
+	DirectionalLight(vec3 direction, vec3 colour ) {
 
 		this->direction = direction;
 		this->colour = colour;
@@ -79,6 +80,8 @@ bool				rotateRightPressed;
 // Scene objects
 AIMesh*				groundMesh = nullptr;
 AIMesh*				creatureMesh = nullptr;
+AIMesh* outMesh = nullptr;
+
 
 Cylinder*			cylinderMesh = nullptr;
 
@@ -104,25 +107,27 @@ GLint				texPointLightShader_lightPosition;
 GLint				texPointLightShader_lightColour;
 GLint				texPointLightShader_lightAttenuation;
 
+bool forFlag;
+bool backFlag;
 
 // cylinder model
-vec3 cylinderPos = vec3(-2.0f, 2.0f, 0.0f);
+vec3 cylinderPos = vec3(10.0f, 0.0f, 10.0f);
 
 // beast model
-vec3 beastPos = vec3(2.0f, 0.0f, 0.0f);
-float beastRotation = 0.0f;
+
 
 
 
 // Directional light example (declared as a single instance)
-float directLightTheta = 0.0f;
-DirectionalLight directLight = DirectionalLight(vec3(cosf(directLightTheta), sinf(directLightTheta), 0.0f));
+
+DirectionalLight directLight = DirectionalLight(vec3(5.f,2.0f , 2.0f), vec3(.3f, .20f, .20f));
 
 // Setup point light example light (use array to make adding other lights easier later)
 PointLight lights[1] = {
 	PointLight(vec3(0.0f, 1.0f, 0.0), vec3(1.0f, 0.0f, 0.0f), vec3(1.0f, 0.1f, 0.001f))
 };
-Shrine* shrine = new Shrine(vec3(10.0f,0.0f,10.0f));
+Shrine* shrine = new Shrine();
+upgShrine* shrineUpg = new upgShrine();
 
 #pragma endregion
 
@@ -130,7 +135,7 @@ Shrine* shrine = new Shrine(vec3(10.0f,0.0f,10.0f));
 // Function prototypes
 void renderScene();
 void renderWithDirectionalLight();
-void renderWithPointLight();
+
 void renderWithMultipleLights();
 void updateScene();
 void resizeWindow(GLFWwindow* window, int width, int height);
@@ -211,11 +216,19 @@ int main() {
 	//
 	mainCamera = new ArcballCamera(-33.0f, 45.0f, 8.0f, 55.0f, (float)windowWidth/(float)windowHeight, 0.1f, 500.0f);
 	
-	shrine->init();
+	shrine->init(vec3(10.0f, 0.0f, 10.0f));
+	shrineUpg->initUpg(vec3(0.0f, 0.0f, 0.0f));
+	
 	
 	groundMesh = new AIMesh(string("Assets\\ground-surface\\surface01.obj"));
 	if (groundMesh) {
-		groundMesh->addTexture("Assets\\ground-surface\\lunar-surface01.png", FIF_PNG);
+		groundMesh->addTexture("Assets\\ground-surface\\Terrain5.png", FIF_PNG);
+	}
+
+	outMesh = new AIMesh(string("Assets\\outline.obj"));
+	if (outMesh)
+	{
+		outMesh->addTexture("Assets\\woodTexture.png", FIF_PNG);
 	}
 
 
@@ -226,7 +239,7 @@ int main() {
 	
 	
 	
-	cylinderMesh = new Cylinder(string("Assets\\cylinder\\cylinderT.obj"));
+	cylinderMesh = new Cylinder(string("Assets\\shrine\\box.obj"));
 	
 
 	// Load shaders
@@ -253,6 +266,7 @@ int main() {
 	//
 	// 2. Main loop
 	// 
+	mainCamera->scaleRadius(5.0f);
 
 	while (!glfwWindowShouldClose(window)) {
 
@@ -263,9 +277,7 @@ int main() {
 		glfwPollEvents();					// Use this version when animating as fast as possible
 	
 		// update window title
-		char timingString[256];
-		sprintf_s(timingString, 256, "CIS5013: Average fps: %.0f; Average spf: %f", gameClock->averageFPS(), gameClock->averageSPF() / 1000.0f);
-		glfwSetWindowTitle(window, timingString);
+		
 	}
 
 	glfwTerminate();
@@ -296,7 +308,7 @@ void renderWithDirectionalLight() {
 
 	// Get camera matrices
 	mat4 cameraProjection = mainCamera->projectionTransform();
-	mat4 cameraView = mainCamera->viewTransform() * translate(identity<mat4>(), -beastPos);
+	mat4 cameraView = mainCamera->viewTransform();
 
 	// Plug-in texture-directional light shader and setup relevant uniform variables
 	// (keep this shader for all textured objects affected by the light source)
@@ -315,7 +327,7 @@ void renderWithDirectionalLight() {
 
 	if (groundMesh) {
 
-		mat4 modelTransform = glm::scale(identity<mat4>(), vec3(10.0f, 1.0f, 10.0f));
+		mat4 modelTransform = glm::scale(identity<mat4>(), vec3(20.0f, 1.0f, 20.0f));
 
 		glUniformMatrix4fv(texDirLightShader_modelMatrix, 1, GL_FALSE, (GLfloat*)&modelTransform);
 		
@@ -324,44 +336,26 @@ void renderWithDirectionalLight() {
 		groundMesh->postRender();
 	}
 
-	if (creatureMesh) {
-
-		mat4 modelTransform = glm::translate(identity<mat4>(), beastPos) * eulerAngleY<float>(glm::radians<float>(beastRotation));
-
-		glUniformMatrix4fv(texDirLightShader_modelMatrix, 1, GL_FALSE, (GLfloat*)&modelTransform);
-
-		creatureMesh->preRender();
-		creatureMesh->render();
-		creatureMesh->postRender();
-	}
-
-	AIMesh* tempPil = shrine->getPillar();
-	if (tempPil) {
-		for (int i = 0; i < 6; i++)
-		{
-
-			mat4 modelTransform = glm::translate(identity<mat4>(), shrine->pillarPos[i]) * glm::scale(identity<mat4>(), shrine->getScale()) ;
-
-			glUniformMatrix4fv(texDirLightShader_modelMatrix, 1, GL_FALSE, (GLfloat*)&modelTransform);
-
-			tempPil->preRender();
-			tempPil->render();
-			tempPil->postRender();
-		}
-	}
-	AIMesh* tempRoof = shrine->getRoof();
-	if (tempRoof)
+	if (outMesh)
 	{
-		mat4 modelTransform = glm::translate(identity<mat4>(), shrine->getPos()) * glm::scale(identity<mat4>(), shrine->getScale());
+		mat4 modelTransform = glm::scale(identity<mat4>(), vec3(0.2f, .1f, 0.2f));
 
 		glUniformMatrix4fv(texDirLightShader_modelMatrix, 1, GL_FALSE, (GLfloat*)&modelTransform);
 
-		tempRoof->preRender();
-		tempRoof->render();
-		tempRoof->postRender();
+		outMesh->preRender();
+		outMesh->render();
+		outMesh->postRender();
 	}
-	tempPil = nullptr;
-	tempRoof = nullptr;
+
+
+	
+	shrine->rend(texDirLightShader_modelMatrix);
+	shrineUpg->rend(texDirLightShader_modelMatrix);
+	
+	
+	
+	
+
 #pragma endregion
 
 
@@ -405,101 +399,6 @@ void renderWithDirectionalLight() {
 
 
 // Demonstrate the use of a single point light source
-void renderWithPointLight() {
-
-	// Clear the rendering window
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	// Get camera matrices
-	mat4 cameraProjection = mainCamera->projectionTransform();
-	mat4 cameraView = mainCamera->viewTransform() * translate(identity<mat4>(), -beastPos);
-
-	// Plug-in texture-point light shader and setup relevant uniform variables
-	// (keep this shader for all textured objects affected by the light source)
-	glUseProgram(texPointLightShader);
-
-	glUniformMatrix4fv(texPointLightShader_viewMatrix, 1, GL_FALSE, (GLfloat*)&cameraView);
-	glUniformMatrix4fv(texPointLightShader_projMatrix, 1, GL_FALSE, (GLfloat*)&cameraProjection);
-	glUniform1i(texPointLightShader_texture, 0); // set to point to texture unit 0 for AIMeshes
-	glUniform3fv(texPointLightShader_lightPosition, 1, (GLfloat*)&(lights[0].pos));
-	glUniform3fv(texPointLightShader_lightColour, 1, (GLfloat*)&(lights[0].colour)); 
-	glUniform3fv(texPointLightShader_lightAttenuation, 1, (GLfloat*)&(lights[0].attenuation));
-	
-#pragma region Render opaque objects
-
-	if (groundMesh) {
-
-		mat4 modelTransform = glm::scale(identity<mat4>(), vec3(1.0f, 1.0f, 1.0f)) * glm::translate(identity<mat4>(), vec3(2.0f, 0.0f, 0.0f));
-		
-		glUniformMatrix4fv(texPointLightShader_modelMatrix, 1, GL_FALSE, (GLfloat*)&modelTransform);
-
-		groundMesh->preRender();
-		groundMesh->render();
-		groundMesh->postRender();
-	}
-	if (groundMesh) {
-
-		mat4 modelTransform = glm::scale(identity<mat4>(), vec3(1.0f, 1.0f, 1.0f)) * glm::translate(identity<mat4>(), vec3(2.0f, 0.0f, 2.0f));
-
-		glUniformMatrix4fv(texPointLightShader_modelMatrix, 1, GL_FALSE, (GLfloat*)&modelTransform);
-
-		groundMesh->preRender();
-		groundMesh->render();
-		groundMesh->postRender();
-	}
-	
-
-
-	if (creatureMesh) {
-
-		mat4 modelTransform = glm::translate(identity<mat4>(), beastPos) * eulerAngleY<float>(glm::radians<float>(beastRotation));
-
-		glUniformMatrix4fv(texPointLightShader_modelMatrix, 1, GL_FALSE, (GLfloat*)&modelTransform);
-
-		creatureMesh->preRender();
-		creatureMesh->render();
-		
-		creatureMesh->postRender();
-	}
-
-
-#pragma endregion
-
-#pragma region Render transparant objects
-
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-	if (cylinderMesh) {
-
-		mat4 T = cameraProjection * cameraView * glm::translate(identity<mat4>(), cylinderPos);
-
-		cylinderMesh->preRender();
-		cylinderMesh->render(T);
-		cylinderMesh->postRender();
-	}
-
-	glDisable(GL_BLEND);
-
-#pragma endregion
-
-
-	//
-	// For demo purposes, render point light source
-	//
-
-	// Restore fixed-function
-	glUseProgram(0);
-
-	mat4 cameraT = cameraProjection * cameraView;
-	glLoadMatrixf((GLfloat*)&cameraT);
-	glEnable(GL_POINT_SMOOTH);
-	glPointSize(10.0f);
-	glBegin(GL_POINTS);
-	glColor3f(lights[0].colour.r, lights[0].colour.g, lights[0].colour.b);
-	glVertex3f(lights[0].pos.x, lights[0].pos.y, lights[0].pos.z);
-	glEnd();
-}
 
 
 void renderWithMultipleLights() {
@@ -509,7 +408,7 @@ void renderWithMultipleLights() {
 
 	// Get camera matrices
 	mat4 cameraProjection = mainCamera->projectionTransform();
-	mat4 cameraView = mainCamera->viewTransform() * translate(identity<mat4>(), -beastPos);
+	mat4 cameraView = mainCamera->viewTransform();
 
 
 #pragma region Render all opaque objects with directional light
@@ -533,16 +432,7 @@ void renderWithMultipleLights() {
 		groundMesh->postRender();
 	}
 
-	if (creatureMesh) {
 
-		mat4 modelTransform = glm::translate(identity<mat4>(), beastPos) * eulerAngleY<float>(glm::radians<float>(beastRotation));
-
-		glUniformMatrix4fv(texDirLightShader_modelMatrix, 1, GL_FALSE, (GLfloat*)&modelTransform);
-
-		creatureMesh->preRender();
-		creatureMesh->render();
-		creatureMesh->postRender();
-	}
 
 
 #pragma endregion
@@ -575,17 +465,6 @@ void renderWithMultipleLights() {
 		groundMesh->preRender();
 		groundMesh->render();
 		groundMesh->postRender();
-	}
-
-	if (creatureMesh) {
-
-		mat4 modelTransform = glm::translate(identity<mat4>(), beastPos) * eulerAngleY<float>(glm::radians<float>(beastRotation));
-
-		glUniformMatrix4fv(texPointLightShader_modelMatrix, 1, GL_FALSE, (GLfloat*)&modelTransform);
-
-		creatureMesh->preRender();
-		creatureMesh->render();
-		creatureMesh->postRender();
 	}
 
 #pragma endregion
@@ -637,19 +516,17 @@ void renderWithMultipleLights() {
 // Function called to animate elements in the scene
 void updateScene() {
 
-	float tDelta = 0.0f;
+	
 
 	if (gameClock) {
 
 		gameClock->tick();
-		tDelta = (float)gameClock->gameTimeDelta();
+		
 	}
 
-	cylinderMesh->update(tDelta);
+	
 
-	// update main light source
-	directLightTheta += glm::radians(45.0f) * tDelta;
-	directLight.direction = vec3(cosf(directLightTheta), sinf(directLightTheta), 0.0f);
+
 
 	//
 	// Handle movement based on user input
@@ -658,26 +535,41 @@ void updateScene() {
 	float moveSpeed = 3.0f; // movement displacement per second
 	float rotateSpeed = 90.0f; // degrees rotation per second
 
-	if (forwardPressed) {
+	if (forwardPressed)
+	{
 
-		mat4 R = eulerAngleY<float>(glm::radians<float>(beastRotation)); // local coord space / basis vectors - move along z
-		float dPos = moveSpeed * tDelta; // calc movement based on time elapsed
-		beastPos += vec3(R[2].x * dPos, R[2].y * dPos, R[2].z * dPos); // add displacement to position vector
+		if (!forFlag)
+		{
+			mainCamera->scaleRadius(.5f);
+			forFlag = true;
+		}
 	}
-	else if (backPressed) {
+	else
+	{
+		forFlag = false;
+	}
+	if (backPressed)
+	{
+		if (!backFlag)
+		{
 
-		mat4 R = eulerAngleY<float>(glm::radians<float>(beastRotation)); // local coord space / basis vectors - move along z
-		float dPos = -moveSpeed * tDelta; // calc movement based on time elapsed
-		beastPos += vec3(R[2].x * dPos, R[2].y * dPos, R[2].z * dPos); // add displacement to position vector
+			mainCamera->scaleRadius(2.0f);
+			backFlag = true;
+		}
 	}
+	else
+	{
+		backFlag = false;
+	}
+
 
 	if (rotateLeftPressed) {
 
-		beastRotation += rotateSpeed * tDelta;
+		mainCamera->rotateCamera(0.0f,-1.0f);
 	}
 	else if (rotateRightPressed) {
 
-		beastRotation -= rotateSpeed * tDelta;
+		mainCamera->rotateCamera(0.0f, 1.0f);
 	}
 
 }
@@ -764,17 +656,7 @@ void keyboardHandler(GLFWwindow* window, int key, int scancode, int action, int 
 
 void mouseMoveHandler(GLFWwindow* window, double xpos, double ypos) {
 
-	if (mouseDown) {
-
-		float dx = float(xpos - prevMouseX);
-		float dy = float(ypos - prevMouseY);
-
-		if (mainCamera)
-			mainCamera->rotateCamera(-dy, -dx);
-
-		prevMouseX = xpos;
-		prevMouseY = ypos;
-	}
+	
 
 }
 
@@ -795,14 +677,6 @@ void mouseButtonHandler(GLFWwindow* window, int button, int action, int mods) {
 }
 
 void mouseScrollHandler(GLFWwindow* window, double xoffset, double yoffset) {
-
-	if (mainCamera) {
-
-		if (yoffset < 0.0)
-			mainCamera->scaleRadius(1.1f);
-		else if (yoffset > 0.0)
-			mainCamera->scaleRadius(0.9f);
-	}
 }
 
 void mouseEnterHandler(GLFWwindow* window, int entered) {

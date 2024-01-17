@@ -13,6 +13,5 @@ layout (location=0) out vec4 fragColour;
 
 void main(void) {
 
-	fragColour = texture2D(texture, inputFragment.texCoord);
-
+	fragColour = vec4(0.0f,0.0f,0.0f,0.5f);
 }

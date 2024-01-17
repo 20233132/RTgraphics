@@ -184,6 +184,10 @@
     <None Include="Assets\cylinder\cylinder.vert" />
     <None Include="Assets\Shaders\basic_texture.frag" />
     <None Include="Assets\Shaders\basic_texture.vert" />
+    <None Include="Assets\Shaders\texture-directional.frag" />
+    <None Include="Assets\Shaders\texture-directional.vert" />
+    <None Include="wall_trans.frag" />
+    <None Include="wall_trans.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

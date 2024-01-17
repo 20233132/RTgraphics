@@ -18,6 +18,8 @@ class Cylinder : public AIMesh {
 	GLint shader_wave1Phase = -1;
 	GLint shader_wave2Phase = -1;
 
+
+
 	float wavePhase = 0.0f;
 
 public:
@@ -28,5 +30,5 @@ public:
 	void render(glm::mat4 transform);
 	void postRender();
 
-	void update(float tDelta);
+	void update();
 };
